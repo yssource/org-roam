@@ -494,9 +494,20 @@ as many characters as possible and will be aligned accordingly."
   :group 'org-roam
   :type  'string)
 
-(defun org-roam--tags-to-str (tags)
-  "Convert list of TAGS into a string."
-  (mapconcat (lambda (s) (concat "#" s)) tags " "))
+(defcustom org-roam-template-key-prefixes
+  '(("tags" . "#")
+    ("todo" . "t:"))
+  "Prefixes for each of the node properties.
+This is used in conjunction with
+`org-roam-node-display-template': in minibuffer completions the
+node properties will be prefixed with strings in this variable,
+acting as a query language of sorts.
+
+For example, if a node has tags (\"foo\" \"bar\") and the alist
+has the entry (\"tags\" . \"#\"), these will appear as
+\"#foo #bar\"."
+  :group 'org-roam
+  :type  '(alist))
 
 (defun org-roam-node--format-entry (node width)
   "Formats NODE for display in the results list.
@@ -510,16 +521,21 @@ Uses `org-roam-node-display-template' to format the entry."
               (field-name (car field))
               (field-width (cadr field))
               (getter (intern (concat "org-roam-node-" field-name)))
-              (field-value (or (funcall getter node) "")))
-         (when (and (equal field-name "tags")
-                    field-value)
-           (setq field-value (org-roam--tags-to-str field-value)))
+              (field-value (funcall getter node)))
          (when (and (equal field-name "file")
                     field-value)
            (setq field-value (file-relative-name field-value org-roam-directory)))
          (when (and (equal field-name "olp")
                     field-value)
            (setq field-value (string-join field-value " > ")))
+         (when (and field-value (not (listp field-value)))
+           (setq field-value (list field-value)))
+         (setq field-value (mapconcat
+                            (lambda (v)
+                              (concat (or (cdr (assoc field-name org-roam-template-key-prefixes))
+                                          "")
+                                      v))
+                            field-value " "))
          (if (not field-width)
              field-value
            (setq field-width (string-to-number field-width))
